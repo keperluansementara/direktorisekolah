@@ -1,16 +1,53 @@
-# React + Vite
+# DirektoriSekolah.id
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Platform direktori sekolah Indonesia berbasis **OpenStreetMap** yang memungkinkan pengguna menemukan sekolah, melihat lokasi di peta, dan menganalisis data pendidikan secara interaktif.
 
-Currently, two official plugins are available:
+Live Website
+https://direktorisekolah.vercel.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🚀 Fitur Utama
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 🔎 Live School Scraping
 
-## Expanding the ESLint configuration
+Mengambil data sekolah secara real-time dari OpenStreetMap menggunakan Overpass API.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 🗺 Interactive Map
+
+Peta interaktif berbasis Leaflet dengan marker clustering untuk menampilkan ribuan sekolah secara efisien.
+
+### 📍 Radius Search
+
+Temukan sekolah dalam radius tertentu dari lokasi Anda.
+
+### 🔥 Heatmap Sekolah
+
+Visualisasi kepadatan sekolah untuk memahami distribusi pendidikan di suatu wilayah.
+
+### 📊 Analitik Pendidikan
+
+Statistik jumlah sekolah berdasarkan jenjang:
+
+* SD
+* SMP
+* SMA
+* SMK
+* Perguruan Tinggi
+
+### ⭐ Bookmark Sekolah
+
+Simpan sekolah favorit ke Local Storage.
+
+### 📥 Export Data
+
+Download hasil scraping sekolah ke format CSV untuk analisis lebih lanjut.
+
+---
+
+## 🧠 Tujuan Project
+
+DirektoriSekolah.id dibuat untuk menjadi:
+
+* Direktori sekolah nasional Indonesia
+* Pla
