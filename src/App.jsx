@@ -1849,7 +1849,7 @@ export default function App() {
                 <RefreshCw size={24} className="group-hover:animate-spin" />
               </div>
               <span className="font-black text-2xl tracking-tight text-gray-900">
-                Directory<span className="text-blue-600">Sekolah.id</span>
+                Direktori<span className="text-blue-600">Sekolah.id</span>
               </span>
             </a>
 
