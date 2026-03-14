@@ -1,0 +1,36 @@
+<svg width="520" height="180" viewBox="0 0 520 180" xmlns="http://www.w3.org/2000/svg">
+
+<defs>
+<linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#2563EB"/>
+<stop offset="100%" stop-color="#1E3A8A"/>
+</linearGradient>
+</defs>
+
+<!-- Map pin -->
+<path d="M90 10 C55 10 30 35 30 70 C30 110 90 170 90 170 C90 170 150 110 150 70 C150 35 125 10 90 10Z"
+fill="url(#g1)"/>
+
+<!-- School -->
+<rect x="65" y="70" width="50" height="38" rx="4" fill="#60A5FA"/>
+<polygon points="60,70 90,50 120,70" fill="#1E3A8A"/>
+
+<!-- Data nodes -->
+<circle cx="45" cy="50" r="4" fill="#6366F1"/>
+<circle cx="135" cy="50" r="4" fill="#6366F1"/>
+<circle cx="90" cy="25" r="4" fill="#6366F1"/>
+
+<line x1="45" y1="50" x2="90" y2="70" stroke="#6366F1" stroke-width="2"/>
+<line x1="135" y1="50" x2="90" y2="70" stroke="#6366F1" stroke-width="2"/>
+<line x1="90" y1="25" x2="90" y2="50" stroke="#6366F1" stroke-width="2"/>
+
+<!-- Text -->
+<text x="180" y="80" font-size="36" font-weight="700" fill="#2563EB" font-family="Inter, Arial">
+Direktori
+</text>
+
+<text x="180" y="120" font-size="36" font-weight="700" fill="#1E3A8A" font-family="Inter, Arial">
+Sekolah.id
+</text>
+
+</svg>
