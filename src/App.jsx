@@ -1185,6 +1185,93 @@ const AnalyticsPage = ({ globalSchools }) => {
   );
 };
 
+// --- LEGAL & INFO PAGES (ADSENSE REQUIREMENTS) ---
+const LegalLayout = ({ title, icon: Icon, children }) => (
+  <div className="max-w-4xl mx-auto px-4 py-12 min-h-[60vh]">
+    <div className="mb-8 border-b border-gray-200 pb-6">
+      <h1 className="text-4xl font-black text-gray-900 flex items-center gap-3">
+        {Icon && <Icon className="text-blue-600" size={36} />} {title}
+      </h1>
+    </div>
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 md:p-12 text-gray-700 leading-relaxed space-y-6 font-medium text-lg">
+      {children}
+    </div>
+  </div>
+);
+
+const AboutPage = () => (
+  <LegalLayout title="Tentang Kami" icon={Info}>
+    <p>Selamat datang di <strong>DirektoriSekolah.id</strong>.</p>
+    <p>Platform ini dikembangkan sebagai inisiatif untuk memudahkan akses publik terhadap data pendidikan di seluruh Indonesia. Kami menggunakan teknologi pemetaan modern untuk menyajikan informasi sekolah, mulai dari jenjang Pendidikan Dasar (SD), Menengah (SMP, SMA, SMK), hingga Perguruan Tinggi.</p>
+    <p>Kami menyadari betapa pentingnya akses informasi yang transparan dan mudah diakses bagi para orang tua, siswa, maupun peneliti. Oleh karena itu, DirektoriSekolah.id dirancang dengan antarmuka peta interaktif <em>(Live Map)</em> dan sistem pencarian radius yang memungkinkan Anda menemukan institusi pendidikan terdekat dari lokasi Anda.</p>
+    <p>Seluruh data spasial dan atribut institusi pendidikan yang ditampilkan di website ini bersumber dari database terbuka <strong>OpenStreetMap (OSM)</strong> yang dikontribusikan oleh para relawan pemetaan dari seluruh dunia.</p>
+  </LegalLayout>
+);
+
+const PrivacyPolicyPage = () => (
+  <LegalLayout title="Privacy Policy" icon={CheckSquare}>
+    <p><strong>DirektoriSekolah.id</strong> adalah platform direktori sekolah berbasis data OpenStreetMap.</p>
+    <p>Website ini menggunakan cookie untuk meningkatkan pengalaman pengguna dan menampilkan iklan melalui Google AdSense.</p>
+
+    <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4">Penggunaan Cookie dan Google AdSense</h3>
+    <ul className="list-disc pl-6 space-y-2">
+      <li>Pihak ketiga (termasuk Google) menggunakan cookie untuk menayangkan iklan berdasarkan kunjungan pengguna sebelumnya ke website ini maupun website lain di internet.</li>
+      <li>Penggunaan cookie iklan (seperti Cookie DART) oleh Google memungkinkan mereka dan mitra mereka untuk menayangkan iklan kepada pengunjung situs kami berdasarkan kunjungan mereka ke DirektoriSekolah.id dan/atau situs lainnya di internet.</li>
+      <li>Pengguna dapat memilih untuk menonaktifkan iklan hasil personalisasi dengan mengunjungi <a href="https://www.google.com/settings/ads" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Pengaturan Iklan Google (Ads Settings)</a>. Anda juga dapat memilih untuk menonaktifkan penggunaan cookie vendor pihak ketiga untuk iklan hasil personalisasi dengan mengunjungi <a href="https://www.aboutads.info" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">www.aboutads.info</a>.</li>
+    </ul>
+
+    <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4">Penyimpanan Data Lokal</h3>
+    <p>Aplikasi ini memiliki fitur penyimpanan lokal <em>(Local Storage)</em> yang menyimpan data "Sekolah Favorit" serta hasil "Scraping Peta" Anda. Data ini <strong>hanya disimpan di memori peramban (browser) perangkat Anda secara offline</strong> dan tidak pernah kami kirimkan, simpan, atau jual ke server pihak ketiga mana pun.</p>
+  </LegalLayout>
+);
+
+const TermsPage = () => (
+  <LegalLayout title="Terms of Service" icon={Scale}>
+    <p>Dengan mengakses dan menggunakan layanan <strong>DirektoriSekolah.id</strong>, Anda menyetujui syarat dan ketentuan berikut:</p>
+
+    <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4">1. Sumber dan Akurasi Data</h3>
+    <p>Seluruh informasi sekolah dan institusi pendidikan (termasuk koordinat, alamat, telepon, dan jenjang) ditarik secara langsung <em>(live)</em> dari API publik <strong>OpenStreetMap (OSM)</strong>. Data disediakan dengan asas "sebagaimana adanya" <em>(as is)</em>. Kami tidak menjamin kelengkapan, keakuratan, atau kemutakhiran data, karena hal tersebut sangat bergantung pada kontribusi relawan OSM lokal.</p>
+
+    <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4">2. Penggunaan Layanan</h3>
+    <p>Platform ini disediakan untuk tujuan informasi dan non-komersial. Pengguna dilarang melakukan tindakan penyalahgunaan <em>(abuse)</em> seperti penarikan data massal secara otomatis <em>(automated bot scraping)</em> yang dapat membebani server infrastruktur OpenStreetMap API.</p>
+
+    <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4">3. Penyangkalan (Disclaimer)</h3>
+    <p>DirektoriSekolah.id tidak berafiliasi dengan institusi pendidikan mana pun yang terdaftar di dalam database. Segala keputusan yang diambil berdasarkan informasi di website ini merupakan tanggung jawab pengguna sepenuhnya.</p>
+  </LegalLayout>
+);
+
+const ContactPage = () => (
+  <LegalLayout title="Hubungi Kami" icon={Mail}>
+    <p>Jika Anda memiliki pertanyaan terkait privasi, syarat layanan, kemitraan, atau ingin melaporkan kendala penggunaan website <strong>DirektoriSekolah.id</strong>, silakan hubungi kami melalui surel (email) di bawah ini:</p>
+    <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 mt-6 inline-block">
+      <p className="font-bold text-blue-900 text-xl flex items-center gap-3">
+        <Mail className="text-blue-600" /> hello@direktorisekolah.id
+      </p>
+    </div>
+    <p className="mt-6 text-sm text-gray-500">
+      * Catatan: Untuk kesalahan atau perbaikan alamat spesifik sekolah, kami menyarankan Anda untuk memperbaikinya secara langsung melalui editor publik di platform <a href="https://www.openstreetmap.org" target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline">OpenStreetMap.org</a> agar perubahan tersebut dapat langsung terlihat di website kami pada pemindaian (scrape) berikutnya.
+    </p>
+  </LegalLayout>
+);
+
+// --- COMPONENT FOOTER ---
+const Footer = () => (
+  <footer className="bg-white border-t border-gray-200 pt-10 pb-8 mt-auto z-[1000] relative">
+    <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="text-center md:text-left">
+        <div className="font-black text-xl tracking-tight text-gray-900 mb-2">OSM<span className="text-blue-600">Scraper</span></div>
+        <p className="text-sm text-gray-500 font-medium">© {new Date().getFullYear()} DirektoriSekolah.id. Hak cipta dilindungi. Data dari OpenStreetMap.</p>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm font-bold text-gray-500">
+        <a href="#/about" className="hover:text-blue-600 transition">About</a>
+        <a href="#/privacy-policy" className="hover:text-blue-600 transition">Privacy Policy</a>
+        <a href="#/terms" className="hover:text-blue-600 transition">Terms</a>
+        <a href="#/contact" className="hover:text-blue-600 transition">Contact</a>
+      </div>
+    </div>
+  </footer>
+);
+
 // --- MAIN APP COMPONENT ---
 export default function App() {
   const { route, navigate } = useHashRouter();
@@ -1237,6 +1324,10 @@ export default function App() {
     else if (route.path === '/favorit') document.title = "Sekolah Favorit | Direktori Sekolah";
     else if (route.path === '/analitik') document.title = "Analitik Data | Direktori Sekolah";
     else if (route.path === '/compare') document.title = "Bandingkan Sekolah | Direktori Sekolah";
+    else if (route.path === '/about') document.title = "Tentang Kami | DirektoriSekolah.id";
+    else if (route.path === '/privacy-policy') document.title = "Privacy Policy | DirektoriSekolah.id";
+    else if (route.path === '/terms') document.title = "Terms of Service | DirektoriSekolah.id";
+    else if (route.path === '/contact') document.title = "Hubungi Kami | DirektoriSekolah.id";
     else if (route.path.startsWith('/sekolah/')) document.title = "Memuat Profil... | DirektoriSekolah.id";
     setIsMobileMenuOpen(false);
   }, [route.path]);
@@ -1290,6 +1381,10 @@ export default function App() {
     if (route.path === '/favorit') return <FavoritesPage favorites={favorites} toggleFavorite={handleToggleFavorite} />;
     if (route.path === '/analitik') return <AnalyticsPage globalSchools={globalSchools} />;
     if (route.path === '/compare') return <ComparePage compareList={compareList} toggleCompare={handleToggleCompare} navigate={navigate} />;
+    if (route.path === '/about') return <AboutPage />;
+    if (route.path === '/privacy-policy') return <PrivacyPolicyPage />;
+    if (route.path === '/terms') return <TermsPage />;
+    if (route.path === '/contact') return <ContactPage />;
     if (route.path.startsWith('/sekolah/')) return <DetailPage id={route.path.split('/')[2]} globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} isFetchingOSM={isFetchingOSM} setIsFetchingOSM={setIsFetchingOSM} favorites={favorites} toggleFavorite={handleToggleFavorite} />;
     return <HomePage navigate={navigate} isSearchingGeocode={isSearchingGeocode} setIsSearchingGeocode={setIsSearchingGeocode} />;
   };
@@ -1342,7 +1437,10 @@ export default function App() {
         )}
       </nav>
 
-      <main className="flex-1 w-full">{renderRoute()}</main>
+      <main className="flex-1 w-full flex flex-col">{renderRoute()}</main>
+
+      {/* Footer hanya muncul di halaman yang BUKAN Live Map agar tidak merusak full-screen peta */}
+      {route.path !== '/peta' && <Footer />}
     </div>
   );
 }
