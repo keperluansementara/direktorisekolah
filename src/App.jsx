@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Search, MapPin, Map as MapIcon, List, Building, Users, Download,
   Phone, Globe, Mail, ChevronRight, Navigation, ArrowUpDown,
-  ArrowLeft, Route, Filter, Crosshair, Loader2, Info, RefreshCw, Compass, Trash2, AlertCircle, Menu, X, Star, Flame, PieChart, BarChart2
+  ArrowLeft, Route, Filter, Crosshair, Loader2, Info, RefreshCw, Compass, Trash2, AlertCircle, Menu, X, Star, Flame, PieChart, BarChart2, Scale, CheckSquare, Square
 } from 'lucide-react';
 
 // --- UTILS: HAVERSINE FORMULA FOR RADIUS CALCULATION ---
@@ -230,7 +230,6 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
   const lat = center ? center[0] : 0;
   const lng = center ? center[1] : 0;
 
-  // Handle Resize Map Container
   useEffect(() => {
     if (!mapRef.current) return;
     const resizeObserver = new ResizeObserver(() => {
@@ -240,11 +239,9 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
     return () => resizeObserver.disconnect();
   }, []);
 
-  // INIT MAP & EVENTS (Run once, handles cleanup correctly)
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current) return;
 
-    // Build fresh map
     const map = window.L.map(mapRef.current).setView([lat, lng], zoom);
     window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -257,7 +254,6 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
     clusterGroup.current = cluster;
     mapInstance.current = map;
 
-    // Attached Move Event
     map.on('moveend', () => {
       const bounds = map.getBounds();
       const currentZoom = map.getZoom();
@@ -268,7 +264,6 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
       });
     });
 
-    // Initial Trigger (Delay ensures DOM is fully painted)
     setTimeout(() => {
       if (mapInstance.current) {
         mapInstance.current.invalidateSize();
@@ -280,20 +275,18 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
       }
     }, 200);
 
-    // FIX: CLEANUP MEMORY & LISTENERS ON UNMOUNT (Crucial for Tab Switching)
     return () => {
       if (mapInstance.current) {
         mapInstance.current.off();
-        mapInstance.current.remove(); // Destroys Leaflet map instance and DOM traces
+        mapInstance.current.remove();
         mapInstance.current = null;
         clusterGroup.current = null;
         heatmapLayer.current = null;
         userMarkerRef.current = null;
       }
     };
-  }, [leafletLoaded]); // Empty dependency ensures this acts purely as Mount/Unmount lifecycle
+  }, [leafletLoaded]);
 
-  // UPDATE VIEW WHEN PARENT CHANGES COORDINATES (e.g. from Search)
   useEffect(() => {
     if (!mapInstance.current || !window.L || userLoc) return;
     const map = mapInstance.current;
@@ -303,7 +296,6 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
     }
   }, [lat, lng, zoom, userLoc]);
 
-  // UPDATE USER LOCATION MARKER
   useEffect(() => {
     if (!mapInstance.current || !window.L || !userLoc) return;
     if (!userMarkerRef.current) {
@@ -319,7 +311,6 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
     mapInstance.current.flyTo([userLoc.lat, userLoc.lng], 15, { duration: 1.5 });
   }, [userLoc]);
 
-  // RENDER MARKERS OR HEATMAP
   useEffect(() => {
     if (!mapInstance.current || !window.L || !clusterGroup.current) return;
 
@@ -564,7 +555,7 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
   );
 };
 
-const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite }) => {
+const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, compareList, toggleCompare }) => {
   const [search, setSearch] = useState("");
   const [filterJenjang, setFilterJenjang] = useState("");
   const [filterLokasi, setFilterLokasi] = useState("");
@@ -645,16 +636,39 @@ const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite }
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-white text-gray-500 text-xs uppercase font-bold border-b"><th className="p-5 cursor-pointer hover:text-blue-600" onClick={() => handleSort('nama')}>Nama Sekolah <ArrowUpDown size={14} className="inline" /></th><th className="p-5">Alamat (OSM)</th>{sortConfig.key === 'jarak' && <th className="p-5 text-indigo-600">Jarak</th>}<th className="p-5 text-right">Aksi</th></tr>
+              <tr className="bg-white text-gray-500 text-xs uppercase font-bold border-b">
+                <th className="p-5 cursor-pointer hover:text-blue-600" onClick={() => handleSort('nama')}>Nama Sekolah <ArrowUpDown size={14} className="inline" /></th>
+                <th className="p-5">Alamat (OSM)</th>
+                {sortConfig.key === 'jarak' && <th className="p-5 text-indigo-600">Jarak</th>}
+                <th className="p-5 text-right">Aksi</th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {paginatedData.length === 0 ? (<tr><td colSpan="4" className="p-10 text-center font-bold text-gray-500">Belum ada data.</td></tr>) : (
+              {paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="p-10 text-center font-bold text-gray-500">Belum ada data.</td>
+                </tr>
+              ) : (
                 paginatedData.map(school => (
                   <tr key={school.id} className="hover:bg-blue-50/50">
-                    <td className="p-5"><strong className="text-gray-900 block">{school.nama}</strong><span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase mt-1 inline-block">{school.jenjang}</span></td>
+                    <td className="p-5">
+                      <strong className="text-gray-900 block">{school.nama}</strong>
+                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase mt-1 inline-block">{school.jenjang}</span>
+                    </td>
                     <td className="p-5 text-sm text-gray-600 max-w-xs truncate">{school.alamat}</td>
                     {sortConfig.key === 'jarak' && <td className="p-5 font-bold text-indigo-700">{school.jarakKm < 1 ? `${Math.round(school.jarakKm * 1000)} M` : `${school.jarakKm.toFixed(2)} KM`}</td>}
-                    <td className="p-5 text-right"><div className="flex justify-end gap-2 items-center"><a href={`#/sekolah/${school.id}`} className="inline-flex items-center text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1.5 rounded-lg">Detail <ChevronRight size={16} /></a><BookmarkButton isFavorite={favorites.some(f => f.id === school.id)} onClick={() => toggleFavorite(school)} /></div></td>
+                    <td className="p-5 text-right">
+                      <div className="flex justify-end gap-2 items-center">
+                        <button
+                          onClick={() => toggleCompare(school)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition border ${compareList.some(c => c.id === school.id) ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                        >
+                          {compareList.some(c => c.id === school.id) ? <CheckSquare size={14} /> : <Square size={14} />} Bandingkan
+                        </button>
+                        <a href={`#/sekolah/${school.id}`} className="inline-flex items-center text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1.5 rounded-lg">Detail <ChevronRight size={16} /></a>
+                        <BookmarkButton isFavorite={favorites.some(f => f.id === school.id)} onClick={() => toggleFavorite(school)} />
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -789,6 +803,86 @@ const FavoritesPage = ({ favorites, toggleFavorite }) => {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+const ComparePage = ({ compareList, toggleCompare, navigate }) => {
+  if (compareList.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+        <Scale size={80} className="mx-auto text-gray-300 mb-6" />
+        <h1 className="text-3xl font-black text-gray-800 mb-4">Belum Ada Sekolah yang Dibandingkan</h1>
+        <p className="text-gray-500 mb-8">Silakan pilih maksimal 3 sekolah dari halaman Database Lokal dengan mencentang "Bandingkan".</p>
+        <button onClick={() => navigate('/list')} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg">Buka Database Lokal</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3"><Scale className="text-teal-600" size={32} /> Perbandingan Sekolah</h1>
+          <p className="text-gray-500 mt-2">Membandingkan {compareList.length} dari maksimal 3 sekolah.</p>
+        </div>
+        <button onClick={() => navigate('/list')} className="text-blue-600 bg-blue-50 px-5 py-2.5 rounded-xl font-bold hover:bg-blue-100 transition border border-blue-200">Tambah / Ubah Sekolah</button>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[800px]">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="p-6 w-1/4 text-gray-500 font-bold uppercase tracking-wider text-sm">Atribut</th>
+              {compareList.map(s => (
+                <th key={s.id} className="p-6 w-1/4 border-l border-gray-100 align-top">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="font-black text-lg text-gray-900 leading-tight">{s.nama}</span>
+                    <button onClick={() => toggleCompare(s)} className="text-red-400 hover:text-red-600 p-1.5 bg-red-50 hover:bg-red-100 transition rounded-lg" title="Hapus dari perbandingan"><Trash2 size={16} /></button>
+                  </div>
+                </th>
+              ))}
+              {Array.from({ length: 3 - compareList.length }).map((_, i) => (
+                <th key={`empty-${i}`} className="p-6 w-1/4 border-l border-gray-100 bg-gray-50/50">
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center text-gray-400 text-sm font-bold flex flex-col items-center justify-center h-full">
+                    <Scale size={24} className="mb-2 opacity-50" />
+                    Slot Kosong
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-sm">
+            <tr className="hover:bg-gray-50/50">
+              <td className="p-6 font-bold text-gray-600 bg-gray-50/30">Jenjang</td>
+              {compareList.map(s => <td key={s.id} className="p-6 border-l border-gray-100"><span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-bold uppercase">{s.jenjang}</span></td>)}
+              {Array.from({ length: 3 - compareList.length }).map((_, i) => <td key={`e1-${i}`} className="p-6 border-l border-gray-100 bg-gray-50/50"></td>)}
+            </tr>
+            <tr className="hover:bg-gray-50/50">
+              <td className="p-6 font-bold text-gray-600 bg-gray-50/30">Alamat</td>
+              {compareList.map(s => <td key={s.id} className="p-6 border-l border-gray-100 text-gray-700 leading-relaxed">{s.alamat}</td>)}
+              {Array.from({ length: 3 - compareList.length }).map((_, i) => <td key={`e2-${i}`} className="p-6 border-l border-gray-100 bg-gray-50/50"></td>)}
+            </tr>
+            <tr className="hover:bg-gray-50/50">
+              <td className="p-6 font-bold text-gray-600 bg-gray-50/30">Telepon</td>
+              {compareList.map(s => <td key={s.id} className="p-6 border-l border-gray-100 text-gray-700 font-medium">{s.telp || '-'}</td>)}
+              {Array.from({ length: 3 - compareList.length }).map((_, i) => <td key={`e3-${i}`} className="p-6 border-l border-gray-100 bg-gray-50/50"></td>)}
+            </tr>
+            <tr className="hover:bg-gray-50/50">
+              <td className="p-6 font-bold text-gray-600 bg-gray-50/30">Website</td>
+              {compareList.map(s => <td key={s.id} className="p-6 border-l border-gray-100">
+                {s.web && s.web !== 'Belum ada data' ? <a href={s.web.startsWith('http') ? s.web : `http://${s.web}`} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline break-all">{s.web}</a> : <span className="text-gray-400 italic">Belum ada data</span>}
+              </td>)}
+              {Array.from({ length: 3 - compareList.length }).map((_, i) => <td key={`e4-${i}`} className="p-6 border-l border-gray-100 bg-gray-50/50"></td>)}
+            </tr>
+            <tr className="hover:bg-gray-50/50">
+              <td className="p-6 font-bold text-gray-600 bg-gray-50/30">Aksi</td>
+              {compareList.map(s => <td key={s.id} className="p-6 border-l border-gray-100"><button onClick={() => navigate('/sekolah/' + s.id)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold transition shadow-sm">Lihat Detail</button></td>)}
+              {Array.from({ length: 3 - compareList.length }).map((_, i) => <td key={`e5-${i}`} className="p-6 border-l border-gray-100 bg-gray-50/50"></td>)}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -959,6 +1053,8 @@ export default function App() {
     return [];
   });
 
+  const [compareList, setCompareList] = useState([]);
+
   const [isFetchingOSM, setIsFetchingOSM] = useState(false);
   const [isSearchingGeocode, setIsSearchingGeocode] = useState(false);
 
@@ -973,15 +1069,29 @@ export default function App() {
     });
   }, []);
 
+  const handleToggleCompare = useCallback((school) => {
+    setCompareList(prev => {
+      if (prev.some(s => s.id === school.id)) {
+        return prev.filter(s => s.id !== school.id);
+      }
+      if (prev.length >= 3) {
+        alert("Anda hanya dapat membandingkan maksimal 3 sekolah.");
+        return prev;
+      }
+      return [...prev, school];
+    });
+  }, []);
+
   useEffect(() => {
-    const handleMapFav = (e) => {
-      const id = e.detail;
-      const school = globalSchools.find(s => s.id === id) || favorites.find(s => s.id === id);
-      if (school) handleToggleFavorite(school);
-    };
-    window.addEventListener('toggle-fav-osm', handleMapFav);
-    return () => window.removeEventListener('toggle-fav-osm', handleMapFav);
-  }, [globalSchools, favorites, handleToggleFavorite]);
+    if (route.path === '/') document.title = "Live Scrape Sekolah | Direktori OSM";
+    else if (route.path === '/peta') document.title = "Peta OSM | Direktori Sekolah";
+    else if (route.path === '/list') document.title = "Database Lokal | Direktori Sekolah";
+    else if (route.path === '/direktori') document.title = "Direktori per Kota | Direktori Sekolah";
+    else if (route.path === '/favorit') document.title = "Sekolah Favorit | Direktori Sekolah";
+    else if (route.path === '/analitik') document.title = "Analitik Data | Direktori Sekolah";
+    else if (route.path === '/compare') document.title = "Bandingkan Sekolah | Direktori Sekolah";
+    setIsMobileMenuOpen(false);
+  }, [route.path]);
 
   const fetchSchoolsFromOSM = async (bounds) => {
     setIsFetchingOSM(true);
@@ -1025,22 +1135,13 @@ export default function App() {
     } catch (err) { alert(err.message); } finally { setIsFetchingOSM(false); }
   };
 
-  useEffect(() => {
-    if (route.path === '/') document.title = "Live Scrape Sekolah | Direktori OSM";
-    else if (route.path === '/peta') document.title = "Peta OSM | Direktori Sekolah";
-    else if (route.path === '/list') document.title = "Database Lokal | Direktori Sekolah";
-    else if (route.path === '/direktori') document.title = "Direktori per Kota | Direktori Sekolah";
-    else if (route.path === '/favorit') document.title = "Sekolah Favorit | Direktori Sekolah";
-    else if (route.path === '/analitik') document.title = "Analitik Data | Direktori Sekolah";
-    setIsMobileMenuOpen(false);
-  }, [route.path]);
-
   const renderRoute = () => {
     if (route.path === '/peta') return <MapPage query={route.query} globalSchools={globalSchools} fetchSchoolsFromOSM={fetchSchoolsFromOSM} isFetchingOSM={isFetchingOSM} navigate={navigate} favorites={favorites} />;
-    if (route.path === '/list') return <ListPage globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} favorites={favorites} toggleFavorite={handleToggleFavorite} />;
+    if (route.path === '/list') return <ListPage globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} favorites={favorites} toggleFavorite={handleToggleFavorite} compareList={compareList} toggleCompare={handleToggleCompare} />;
     if (route.path === '/direktori') return <DirectoryPage navigate={navigate} />;
     if (route.path === '/favorit') return <FavoritesPage favorites={favorites} toggleFavorite={handleToggleFavorite} />;
     if (route.path === '/analitik') return <AnalyticsPage globalSchools={globalSchools} />;
+    if (route.path === '/compare') return <ComparePage compareList={compareList} toggleCompare={handleToggleCompare} navigate={navigate} />;
     if (route.path.startsWith('/sekolah/')) return <DetailPage id={route.path.split('/')[2]} globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} isFetchingOSM={isFetchingOSM} setIsFetchingOSM={setIsFetchingOSM} favorites={favorites} toggleFavorite={handleToggleFavorite} />;
     return <HomePage navigate={navigate} isSearchingGeocode={isSearchingGeocode} setIsSearchingGeocode={setIsSearchingGeocode} />;
   };
@@ -1062,6 +1163,11 @@ export default function App() {
               <a href="#/analitik" className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 ${route.path === '/analitik' ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50 hover:text-purple-600'}`}><PieChart size={16} /> Analitik</a>
               <a href="#/favorit" className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 ${route.path === '/favorit' ? 'bg-yellow-50 text-yellow-700' : 'text-gray-600 hover:bg-gray-50 hover:text-yellow-600'}`}>Favorit <Star size={14} className={favorites.length > 0 ? "fill-yellow-500 text-yellow-500" : ""} /></a>
               <a href="#/peta" className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 ${route.path === '/peta' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-900 text-white hover:bg-gray-800'}`}><MapIcon size={16} /> Live Map</a>
+              {compareList.length > 0 && (
+                <button onClick={() => navigate('/compare')} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-md animate-pulse ml-2">
+                  <Scale size={16} /> Bandingkan Sekarang ({compareList.length})
+                </button>
+              )}
             </div>
 
             <div className="md:hidden flex items-center">
@@ -1077,6 +1183,12 @@ export default function App() {
             <a href="#/list" className={`px-4 py-3 rounded-xl text-base font-bold transition flex items-center justify-between ${route.path === '/list' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}><span>Database Lokal</span><span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs">{globalSchools.length} Data</span></a>
             <a href="#/analitik" className={`px-4 py-3 rounded-xl text-base font-bold transition flex items-center gap-2 ${route.path === '/analitik' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-purple-50'}`}><PieChart size={18} /> Analitik Data</a>
             <a href="#/favorit" className={`px-4 py-3 rounded-xl text-base font-bold transition flex items-center justify-between ${route.path === '/favorit' ? 'bg-yellow-50 text-yellow-700' : 'text-gray-700 hover:bg-yellow-50'}`}><span className="flex items-center gap-2"><Star size={18} className={favorites.length > 0 ? "fill-yellow-500 text-yellow-500" : ""} /> Favorit</span><span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs">{favorites.length} Sekolah</span></a>
+            {compareList.length > 0 && (
+              <a href="#/compare" className={`px-4 py-3 rounded-xl text-base font-bold transition flex items-center justify-between ${route.path === '/compare' ? 'bg-teal-50 text-teal-700' : 'text-gray-700 hover:bg-teal-50'}`}>
+                <span className="flex items-center gap-2"><Scale size={18} className="text-teal-600" /> Bandingkan Sekarang</span>
+                <span className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-xs animate-pulse">{compareList.length} Dipilih</span>
+              </a>
+            )}
             <div className="pt-2"><a href="#/peta" className={`w-full px-4 py-3.5 rounded-xl text-base font-bold transition flex items-center justify-center gap-2 ${route.path === '/peta' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-900 text-white hover:bg-gray-800'}`}><MapIcon size={18} /> Buka Live Map</a></div>
           </div>
         )}
