@@ -753,7 +753,13 @@ const AnalyticsPage = ({ globalSchools }) => {
     return globalSchools.filter(s => {
       let j = s.jenjang?.toUpperCase() || 'LAINNYA';
       if (j.includes('KAMPUS')) j = 'Kampus';
-      return (activeJenjang === 'Lainnya' && j === 'LAINNYA') || j === activeJenjang;
+
+      // FIX: Menangkap semua data yang tidak termasuk di dalam 5 kategori utama ke dalam "Lainnya"
+      if (activeJenjang === 'Lainnya') {
+        return !['SD', 'SMP', 'SMA', 'SMK', 'Kampus'].includes(j);
+      }
+
+      return j === activeJenjang;
     });
   }, [globalSchools, activeJenjang]);
 
@@ -839,7 +845,20 @@ const AnalyticsPage = ({ globalSchools }) => {
           </div>
         </div>
         <div className="lg:col-span-2 bg-white rounded-3xl shadow-lg flex flex-col overflow-hidden border border-gray-100">
-          <div id="analytics-detail-table" className="p-6 bg-gray-50 border-b flex flex-col justify-center"><h3 className="text-lg font-extrabold text-gray-800 flex items-center gap-2"><List className="text-blue-500" size={20} /> Detail Data: Kategori {activeJenjang === 'TOTAL' ? 'Semua Institusi' : activeJenjang} {activeRegion ? `di Wilayah ${activeRegion}` : ''}</h3><p className="text-sm text-gray-500 mt-1">Menampilkan total {tableData.length} baris data.</p></div>
+          <div id="analytics-detail-table" className="p-6 bg-gray-50 border-b flex flex-col justify-center">
+            <h3 className="text-lg font-extrabold text-gray-800 flex items-center gap-2"><List className="text-blue-500" size={20} /> Detail Data: Kategori {activeJenjang === 'TOTAL' ? 'Semua Institusi' : activeJenjang} {activeRegion ? `di Wilayah ${activeRegion}` : ''}</h3>
+            <p className="text-sm text-gray-500 mt-1">Menampilkan total {tableData.length} baris data.</p>
+
+            {/* FITUR BARU: Catatan Penjelasan untuk Kategori Lainnya */}
+            {activeJenjang === 'Lainnya' && (
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex gap-3 text-yellow-800">
+                <Info className="shrink-0 mt-0.5" size={18} />
+                <p className="text-xs font-medium leading-relaxed">
+                  <b>Catatan Kategori "Lainnya":</b> Berisi data institusi pendidikan dari OpenStreetMap yang tidak memiliki tag spesifik SD, SMP, SMA, SMK, atau Kampus. Biasanya ini mencakup: <b>TK / PAUD, Madrasah (MI/MTs/MA), Lembaga Kursus/Pelatihan, SLB,</b> atau sekolah yang oleh relawan hanya diberi label umum tanpa jenjang.
+                </p>
+              </div>
+            )}
+          </div>
           <div className="flex-1 overflow-x-auto min-h-[400px]">
             {tableData.length === 0 ? (
               <div className="p-16 text-center text-gray-400 flex flex-col items-center justify-center h-full"><Search size={48} className="mb-4 opacity-50" /><p className="font-medium text-lg">Tidak ada data untuk ditampilkan</p></div>
