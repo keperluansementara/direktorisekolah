@@ -519,16 +519,42 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
     return true;
   });
 
+  // --- FITUR BARU: ANALISIS WILAYAH ---
+  const mapStats = useMemo(() => {
+    if (!currentBounds) return { count: 0, density: 0, area: 0 };
+    const { south, west, north, east } = currentBounds;
+
+    // 1. Hitung jumlah sekolah yang berada persis di dalam kotak peta (bounds)
+    const schoolsInBounds = filteredSchools.filter(s =>
+      s.lat >= south && s.lat <= north && s.lng >= west && s.lng <= east
+    );
+    const count = schoolsInBounds.length;
+
+    // 2. Hitung luas area menggunakan jarak Haversine (Lebar x Tinggi kotak)
+    const widthKm = getDistanceInKm(south, west, south, east);
+    const heightKm = getDistanceInKm(south, west, north, west);
+    const areaSqKm = widthKm * heightKm;
+
+    // 3. Kalkulasi kepadatan per km persegi
+    const density = areaSqKm > 0 ? (count / areaSqKm) : 0;
+
+    return {
+      count,
+      density: density.toFixed(2),
+      area: areaSqKm.toFixed(2)
+    };
+  }, [currentBounds, filteredSchools]);
+
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 relative overflow-hidden">
-      {showSearchHereBtn && !isFetchingOSM && (
-        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-[1000] ml-0 md:ml-40">
-          <button onClick={handleSearchArea} className="bg-white text-blue-600 px-6 py-2.5 rounded-full font-bold shadow-2xl border hover:bg-blue-50 transition flex items-center gap-2"><RefreshCw size={18} /> Scrape Area Ini</button>
+    <div className="flex flex-col md:flex-row w-full min-h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] bg-gray-50 relative md:overflow-hidden">
+
+      {/* 1. PANEL DATA */}
+      {/* Pada mobile: Auto-height, flex order-2 (di bawah peta), bebas di-scroll. Pada Desktop: flex order-1 (Kiri), tinggi tetap (h-full) */}
+      <div className="w-full md:w-80 bg-white shadow-xl flex flex-col z-[20] border-t md:border-t-0 md:border-r order-2 md:order-1 shrink-0 md:h-full">
+        <div className="p-5 border-b bg-gray-50 flex items-center justify-between sticky top-0 z-[30]">
+          <div className="flex items-center gap-2"><Filter className="text-blue-600" size={20} /><h2 className="text-lg font-extrabold text-gray-800">Panel Data</h2></div>{isFetchingOSM && <Loader2 className="animate-spin text-blue-600" size={20} />}
         </div>
-      )}
-      <div className="w-full md:w-80 shrink-0 h-[45vh] md:h-full bg-white shadow-xl flex flex-col z-[500] border-t md:border-t-0 md:border-r order-2 md:order-1">
-        <div className="p-5 border-b bg-gray-50 flex items-center justify-between"><div className="flex items-center gap-2"><Filter className="text-blue-600" size={20} /><h2 className="text-lg font-extrabold text-gray-800">Panel Data</h2></div>{isFetchingOSM && <Loader2 className="animate-spin text-blue-600" size={20} />}</div>
-        <div className="p-5 flex-1 overflow-y-auto space-y-6">
+        <div className="p-5 flex-1 md:overflow-y-auto space-y-6">
           <form onSubmit={handleMapSearch} className="relative">
             <Search className="absolute left-3 top-3 text-gray-400" size={18} />
             <input type="text" placeholder="Cari Kota/Kecamatan..." className="w-full pl-10 pr-4 py-2.5 bg-white border rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500" value={mapSearchQuery} onChange={(e) => setMapSearchQuery(e.target.value)} disabled={isSearchingLocation} />
@@ -559,11 +585,12 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
                     <div
                       key={s.id}
                       className="p-3 hover:bg-blue-50 cursor-pointer transition group"
-                      onClick={() => {
-                        setLocalSearchQuery(""); // Bersihkan input setelah dipilih
+                      onMouseDown={(e) => {
+                        // Mencegah input kehilangan fokus sebelum klik tercatat pada perangkat Mobile
+                        e.preventDefault();
+                        setLocalSearchQuery("");
                         setShowLocalDropdown(false);
-                        setUserLoc(null); // Memastikan mode lokasi user mati agar map bisa pindah
-                        // Navigasi dengan memicu hash route perubahan query param
+                        setUserLoc(null);
                         navigate('/peta', { lat: s.lat, lng: s.lng, zoom: 18 });
                       }}
                     >
@@ -599,6 +626,25 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
           </div>
 
           <hr className="border-gray-100" />
+
+          {/* KARTU STATISTIK ANALISIS WILAYAH */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <label className="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+              <BarChart2 size={16} className="text-purple-600" /> Analisis Wilayah (Area Terlihat)
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-center">
+                <p className="text-[10px] text-purple-600 font-bold uppercase tracking-wider mb-1">Sekolah di Area</p>
+                <h4 className="text-2xl font-black text-purple-800">{mapStats.count}</h4>
+              </div>
+              <div className="bg-teal-50 p-3 rounded-lg border border-teal-100 text-center">
+                <p className="text-[10px] text-teal-600 font-bold uppercase tracking-wider mb-1">Kepadatan (/km²)</p>
+                <h4 className="text-2xl font-black text-teal-800">{mapStats.density}</h4>
+              </div>
+            </div>
+            {mapStats.area > 0 && <p className="text-[10px] text-gray-500 text-center mt-3 font-medium">Luas area dipetakan: <b>{mapStats.area} km²</b></p>}
+          </div>
+
           <RadiusSearch userLoc={userLoc} locateUser={locateUser} isLocating={isLocating} radius={searchRadius} setRadius={setSearchRadius} resultCount={filteredSchools.length} clearUserLoc={() => setUserLoc(null)} />
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Filter Tampilan (Lokal)</label>
@@ -610,16 +656,29 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
           </div>
         </div>
       </div>
-      <div className="flex-1 relative min-h-0 order-1 md:order-2">
+
+      {/* 2. AREA MAPVIEW */}
+      {/* Pada mobile: Tinggi persis 55vh, flex order-1 (di atas). Pada Desktop: flex order-2 (Kanan), flex-1 memanjang */}
+      <div className="w-full h-[55vh] md:h-full md:flex-1 relative z-[10] order-1 md:order-2 shrink-0">
         <MapView schools={filteredSchools} center={mapCenter} zoom={mapZoom} onBoundsChange={handleBoundsChange} onMapMove={handleMapMove} userLoc={userLoc} favorites={favorites} isHeatmapMode={isHeatmapMode} />
-        <div className="absolute top-6 right-4 md:right-6 z-[1000] scale-90 md:scale-100 origin-top-right">
+
+        {/* Tombol Scrape yang kini disatukan ke dalam koordinat container Peta (tidak terlempar ke layar kosong) */}
+        {showSearchHereBtn && !isFetchingOSM && (
+          <div className="absolute top-4 md:top-6 left-1/2 transform -translate-x-1/2 z-[1000]">
+            <button onClick={handleSearchArea} className="bg-white text-blue-600 px-6 py-2.5 rounded-full font-bold shadow-2xl border hover:bg-blue-50 transition flex items-center gap-2"><RefreshCw size={18} /> Scrape Area Ini</button>
+          </div>
+        )}
+
+        <div className="absolute top-4 right-4 md:top-6 md:right-6 z-[1000] scale-90 md:scale-100 origin-top-right">
           <div className="bg-white rounded-xl shadow-lg border p-1.5 flex items-center">
             <button onClick={() => setIsHeatmapMode(false)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${!isHeatmapMode ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}><MapPin size={16} /> Marker</button>
             <button onClick={() => setIsHeatmapMode(true)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${isHeatmapMode ? 'bg-orange-100 text-orange-700' : 'text-gray-500 hover:bg-gray-50'}`}><Flame size={16} /> Heatmap</button>
           </div>
         </div>
-        <button onClick={locateUser} className="absolute bottom-4 md:bottom-8 right-4 md:right-8 z-[1000] bg-white p-3 rounded-full md:p-3.5 shadow-2xl border hover:bg-blue-50 flex items-center justify-center hover:scale-105 active:scale-95 text-gray-700">{isLocating ? <Loader2 size={24} className="animate-spin text-blue-600" /> : <Crosshair size={24} className={userLoc ? "text-blue-600" : ""} />}</button>
+
+        <button onClick={locateUser} className="absolute bottom-6 right-4 md:bottom-8 md:right-8 z-[1000] bg-white p-3 rounded-full md:p-3.5 shadow-2xl border hover:bg-blue-50 flex items-center justify-center hover:scale-105 active:scale-95 text-gray-700">{isLocating ? <Loader2 size={24} className="animate-spin text-blue-600" /> : <Crosshair size={24} className={userLoc ? "text-blue-600" : ""} />}</button>
       </div>
+
     </div>
   );
 };
