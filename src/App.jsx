@@ -230,6 +230,7 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
   const lat = center ? center[0] : 0;
   const lng = center ? center[1] : 0;
 
+  // Handle Resize Map Container
   useEffect(() => {
     if (!mapRef.current) return;
     const resizeObserver = new ResizeObserver(() => {
@@ -239,35 +240,70 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
     return () => resizeObserver.disconnect();
   }, []);
 
+  // INIT MAP & EVENTS (Run once, handles cleanup correctly)
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current) return;
 
-    if (!mapInstance.current) {
-      mapInstance.current = window.L.map(mapRef.current).setView([lat, lng], zoom);
-      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 18, subdomains: 'abcd'
-      }).addTo(mapInstance.current);
+    // Build fresh map
+    const map = window.L.map(mapRef.current).setView([lat, lng], zoom);
+    window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18, subdomains: 'abcd'
+    }).addTo(map);
 
-      clusterGroup.current = window.L.markerClusterGroup({ chunkedLoading: true, showCoverageOnHover: false });
-      mapInstance.current.addLayer(clusterGroup.current);
+    const cluster = window.L.markerClusterGroup({ chunkedLoading: true, showCoverageOnHover: false });
+    map.addLayer(cluster);
 
-      mapInstance.current.on('moveend', () => {
-        const bounds = mapInstance.current.getBounds();
-        if (onMapMove) onMapMove();
-        if (onBoundsChange) onBoundsChange({ south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() });
+    clusterGroup.current = cluster;
+    mapInstance.current = map;
+
+    // Attached Move Event
+    map.on('moveend', () => {
+      const bounds = map.getBounds();
+      const currentZoom = map.getZoom();
+      if (onMapMove) onMapMove(currentZoom);
+      if (onBoundsChange) onBoundsChange({
+        south: bounds.getSouth(), west: bounds.getWest(),
+        north: bounds.getNorth(), east: bounds.getEast()
       });
+    });
 
-      const bounds = mapInstance.current.getBounds();
-      if (onBoundsChange) onBoundsChange({ south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() });
-    } else if (!userLoc) {
-      const currentCenter = mapInstance.current.getCenter();
-      if (Math.abs(currentCenter.lat - lat) > 0.0001 || Math.abs(currentCenter.lng - lng) > 0.0001 || mapInstance.current.getZoom() !== zoom) {
-        mapInstance.current.setView([lat, lng], zoom);
+    // Initial Trigger (Delay ensures DOM is fully painted)
+    setTimeout(() => {
+      if (mapInstance.current) {
+        mapInstance.current.invalidateSize();
+        const initialBounds = mapInstance.current.getBounds();
+        if (onBoundsChange) onBoundsChange({
+          south: initialBounds.getSouth(), west: initialBounds.getWest(),
+          north: initialBounds.getNorth(), east: initialBounds.getEast()
+        });
       }
-    }
-  }, [leafletLoaded, lat, lng, zoom]);
+    }, 200);
 
+    // FIX: CLEANUP MEMORY & LISTENERS ON UNMOUNT (Crucial for Tab Switching)
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.off();
+        mapInstance.current.remove(); // Destroys Leaflet map instance and DOM traces
+        mapInstance.current = null;
+        clusterGroup.current = null;
+        heatmapLayer.current = null;
+        userMarkerRef.current = null;
+      }
+    };
+  }, [leafletLoaded]); // Empty dependency ensures this acts purely as Mount/Unmount lifecycle
+
+  // UPDATE VIEW WHEN PARENT CHANGES COORDINATES (e.g. from Search)
+  useEffect(() => {
+    if (!mapInstance.current || !window.L || userLoc) return;
+    const map = mapInstance.current;
+    const currentCenter = map.getCenter();
+    if (Math.abs(currentCenter.lat - lat) > 0.0001 || Math.abs(currentCenter.lng - lng) > 0.0001 || map.getZoom() !== zoom) {
+      map.setView([lat, lng], zoom);
+    }
+  }, [lat, lng, zoom, userLoc]);
+
+  // UPDATE USER LOCATION MARKER
   useEffect(() => {
     if (!mapInstance.current || !window.L || !userLoc) return;
     if (!userMarkerRef.current) {
@@ -283,17 +319,19 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
     mapInstance.current.flyTo([userLoc.lat, userLoc.lng], 15, { duration: 1.5 });
   }, [userLoc]);
 
+  // RENDER MARKERS OR HEATMAP
   useEffect(() => {
-    if (!clusterGroup.current || !window.L) return;
+    if (!mapInstance.current || !window.L || !clusterGroup.current) return;
 
-    if (mapInstance.current.hasLayer(clusterGroup.current)) mapInstance.current.removeLayer(clusterGroup.current);
-    if (heatmapLayer.current && mapInstance.current.hasLayer(heatmapLayer.current)) mapInstance.current.removeLayer(heatmapLayer.current);
+    const map = mapInstance.current;
+    if (map.hasLayer(clusterGroup.current)) map.removeLayer(clusterGroup.current);
+    if (heatmapLayer.current && map.hasLayer(heatmapLayer.current)) map.removeLayer(heatmapLayer.current);
 
     if (isHeatmapMode) {
       if (window.L.heatLayer) {
         const heatData = schools.map(s => [s.lat, s.lng, 1]);
         heatmapLayer.current = window.L.heatLayer(heatData, { radius: 25, blur: 15, maxZoom: 17, gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1.0: 'red' } });
-        heatmapLayer.current.addTo(mapInstance.current);
+        heatmapLayer.current.addTo(map);
       }
     } else {
       clusterGroup.current.clearLayers();
@@ -316,7 +354,7 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
         return marker;
       });
       clusterGroup.current.addLayers(markers);
-      mapInstance.current.addLayer(clusterGroup.current);
+      map.addLayer(clusterGroup.current);
     }
   }, [schools, favorites, isHeatmapMode]);
 
@@ -399,7 +437,8 @@ const DirectoryPage = ({ navigate }) => (
 const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, navigate, favorites }) => {
   const [filterJenjang, setFilterJenjang] = useState(query.filter || "");
   const [currentBounds, setCurrentBounds] = useState(null);
-  const [showSearchHereBtn, setShowSearchHereBtn] = useState(false);
+  const [showSearchHereBtn, setShowSearchHereBtn] = useState(true);
+
   const [userLoc, setUserLoc] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isHeatmapMode, setIsHeatmapMode] = useState(false);
@@ -414,8 +453,20 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
   useEffect(() => { if (query.triggerSearch === 'true' && currentBounds && !isFetchingOSM) handleSearchArea(); }, [query.triggerSearch, currentBounds]);
 
   const handleBoundsChange = useCallback((bounds) => setCurrentBounds(bounds), []);
-  const handleMapMove = useCallback(() => { if (mapZoom > 8) setShowSearchHereBtn(true); }, [mapZoom]);
-  const handleSearchArea = () => { if (currentBounds) { fetchSchoolsFromOSM(currentBounds); setShowSearchHereBtn(false); } };
+
+  const handleMapMove = useCallback((z) => {
+    if (z === undefined || z > 8) setShowSearchHereBtn(true);
+    else setShowSearchHereBtn(false);
+  }, []);
+
+  const handleSearchArea = () => {
+    if (currentBounds) {
+      fetchSchoolsFromOSM(currentBounds);
+      setShowSearchHereBtn(false);
+    } else {
+      alert("Area belum terdeteksi. Mohon geser peta sedikit ke arah yang ingin Anda cari.");
+    }
+  };
 
   const handleMapSearch = async (e) => {
     e.preventDefault();
@@ -471,7 +522,22 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
             {isFetchingOSM && <div className="absolute inset-0 bg-blue-100/50 backdrop-blur-sm flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>}
             <p className="text-sm text-blue-600 font-bold mb-1">Berhasil Di-Scrape</p><h3 className="text-4xl font-black text-blue-800">{filteredSchools.length}</h3><p className="text-xs text-blue-600 mt-1">Sekolah di memori</p>
           </div>
-          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex items-start gap-2"><Info className="text-yellow-600 shrink-0 mt-0.5" size={16} /><p className="text-xs text-yellow-800 font-medium">Geser peta dan klik <b>"Scrape Area Ini"</b> untuk mengambil data baru dari OSM.</p></div>
+
+          <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <Info className="text-yellow-600 shrink-0 mt-0.5" size={16} />
+              <p className="text-xs text-yellow-800 font-medium leading-relaxed">Geser peta lalu klik tombol di bawah untuk mengambil data satelit OSM terbaru.</p>
+            </div>
+            <button
+              onClick={handleSearchArea}
+              disabled={isFetchingOSM}
+              className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 py-2.5 rounded-xl text-sm font-extrabold transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={18} className={isFetchingOSM ? "animate-spin" : ""} />
+              {isFetchingOSM ? "Menarik Data..." : "Scrape Area Terlihat"}
+            </button>
+          </div>
+
           <hr className="border-gray-100" />
           <RadiusSearch userLoc={userLoc} locateUser={locateUser} isLocating={isLocating} radius={searchRadius} setRadius={setSearchRadius} resultCount={filteredSchools.length} clearUserLoc={() => setUserLoc(null)} />
           <div>
@@ -754,7 +820,6 @@ const AnalyticsPage = ({ globalSchools }) => {
       let j = s.jenjang?.toUpperCase() || 'LAINNYA';
       if (j.includes('KAMPUS')) j = 'Kampus';
 
-      // FIX: Menangkap semua data yang tidak termasuk di dalam 5 kategori utama ke dalam "Lainnya"
       if (activeJenjang === 'Lainnya') {
         return !['SD', 'SMP', 'SMA', 'SMK', 'Kampus'].includes(j);
       }
@@ -849,7 +914,6 @@ const AnalyticsPage = ({ globalSchools }) => {
             <h3 className="text-lg font-extrabold text-gray-800 flex items-center gap-2"><List className="text-blue-500" size={20} /> Detail Data: Kategori {activeJenjang === 'TOTAL' ? 'Semua Institusi' : activeJenjang} {activeRegion ? `di Wilayah ${activeRegion}` : ''}</h3>
             <p className="text-sm text-gray-500 mt-1">Menampilkan total {tableData.length} baris data.</p>
 
-            {/* FITUR BARU: Catatan Penjelasan untuk Kategori Lainnya */}
             {activeJenjang === 'Lainnya' && (
               <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex gap-3 text-yellow-800">
                 <Info className="shrink-0 mt-0.5" size={18} />
