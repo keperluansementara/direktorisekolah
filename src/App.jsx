@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Search, MapPin, Map as MapIcon, List, Building, Users, Download,
   Phone, Globe, Mail, ChevronRight, Navigation, ArrowUpDown,
-  ArrowLeft, Route, Filter, Crosshair, Loader2, Info, RefreshCw, Compass, Trash2, AlertCircle, Menu, X, Star, Flame, PieChart, BarChart2, Scale, CheckSquare, Square
+  ArrowLeft, Route, Filter, Crosshair, Loader2, Info, RefreshCw, Compass, Trash2, AlertCircle, Menu, X, Star, Flame, PieChart, BarChart2, Scale, CheckSquare, Square, CheckCircle, AlertTriangle, Edit3
 } from 'lucide-react';
 
 // --- UTILS: HAVERSINE FORMULA FOR RADIUS CALCULATION ---
@@ -190,6 +190,40 @@ const useHashRouter = () => {
 
 // --- SHARED COMPONENTS ---
 
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-[4000] w-[90%] max-w-md">
+      <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border ${type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-gray-900 border-gray-800 text-white'}`}>
+        {type === 'error' ? <AlertTriangle size={20} className="text-red-500 shrink-0" /> : type === 'warning' ? <AlertTriangle size={20} className="text-yellow-600 shrink-0" /> : <CheckCircle size={20} className="text-green-400 shrink-0" />}
+        <p className="text-sm font-bold flex-1">{message}</p>
+        <button onClick={onClose} className="hover:opacity-70 shrink-0"><X size={18} /></button>
+      </div>
+    </div>
+  );
+};
+
+const ConfirmModal = ({ dialog, onClose }) => {
+  if (!dialog) return null;
+  return (
+    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[4000] flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center">
+        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle size={32} /></div>
+        <h3 className="text-xl font-black text-gray-900 mb-2">Konfirmasi</h3>
+        <p className="text-gray-500 text-sm mb-6 leading-relaxed">{dialog.message}</p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded-xl font-bold transition">Batal</button>
+          <button onClick={() => { dialog.onConfirm(); onClose(); }} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-lg transition">Ya, Lanjutkan</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const BookmarkButton = ({ isFavorite, onClick, className = "px-3 py-1.5 text-xs" }) => (
   <button
     onClick={onClick}
@@ -366,7 +400,7 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
 
 // --- PAGES ---
 
-const HomePage = ({ navigate, isSearchingGeocode, setIsSearchingGeocode }) => {
+const HomePage = ({ navigate, isSearchingGeocode, setIsSearchingGeocode, showToast }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearch = async (e) => {
@@ -377,14 +411,14 @@ const HomePage = ({ navigate, isSearchingGeocode, setIsSearchingGeocode }) => {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}+Indonesia&limit=1`);
       const data = JSON.parse(await res.text());
       if (data && data.length > 0) navigate('/peta', { lat: data[0].lat, lng: data[0].lon, zoom: 13, triggerSearch: 'true' });
-      else alert("Lokasi tidak ditemukan.");
-    } catch (err) { alert("Terjadi kesalahan: " + err.message); } finally { setIsSearchingGeocode(false); }
+      else showToast("Lokasi tidak ditemukan.", "warning");
+    } catch (err) { showToast("Terjadi kesalahan: " + err.message, "error"); } finally { setIsSearchingGeocode(false); }
   };
 
   const findNearest = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => navigate('/peta', { lat: pos.coords.latitude, lng: pos.coords.longitude, zoom: 15, triggerSearch: 'true', isUserLoc: 'true' }), () => alert("Gagal mendapatkan lokasi."));
-    } else { alert("Geolocation tidak didukung di browser ini."); }
+      navigator.geolocation.getCurrentPosition((pos) => navigate('/peta', { lat: pos.coords.latitude, lng: pos.coords.longitude, zoom: 15, triggerSearch: 'true', isUserLoc: 'true' }), () => showToast("Gagal mendapatkan lokasi.", "error"));
+    } else { showToast("Geolocation tidak didukung di browser ini.", "error"); }
   };
 
   return (
@@ -437,7 +471,7 @@ const DirectoryPage = ({ navigate }) => (
   </div>
 );
 
-const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, navigate, favorites }) => {
+const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, navigate, favorites, showToast }) => {
   const [filterJenjang, setFilterJenjang] = useState(query.filter || "");
   const [currentBounds, setCurrentBounds] = useState(null);
   const [showSearchHereBtn, setShowSearchHereBtn] = useState(true);
@@ -466,8 +500,24 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
     ).slice(0, 10); // Menampilkan maksimal 10 hasil agar rapi
   }, [localSearchQuery, globalSchools]);
 
+  const [cooldownTimer, setCooldownTimer] = useState(0);
+  const hasTriggeredRef = useRef(false);
+
   useEffect(() => { if (query.isUserLoc === 'true' && query.lat && query.lng) setUserLoc({ lat: parseFloat(query.lat), lng: parseFloat(query.lng) }); }, [query.isUserLoc, query.lat, query.lng]);
-  useEffect(() => { if (query.triggerSearch === 'true' && currentBounds && !isFetchingOSM) handleSearchArea(); }, [query.triggerSearch, currentBounds]);
+
+  useEffect(() => {
+    if (query.triggerSearch === 'true' && currentBounds && !isFetchingOSM && !hasTriggeredRef.current) {
+      hasTriggeredRef.current = true;
+      handleSearchArea();
+    }
+  }, [query.triggerSearch, currentBounds, isFetchingOSM]);
+
+  useEffect(() => {
+    if (cooldownTimer > 0) {
+      const timer = setTimeout(() => setCooldownTimer(c => c - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownTimer]);
 
   const handleBoundsChange = useCallback((bounds) => setCurrentBounds(bounds), []);
 
@@ -477,11 +527,16 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
   }, []);
 
   const handleSearchArea = () => {
+    if (cooldownTimer > 0) {
+      showToast(`Sistem sedang jeda. Tunggu ${cooldownTimer} detik.`, "warning");
+      return;
+    }
     if (currentBounds) {
       fetchSchoolsFromOSM(currentBounds);
       setShowSearchHereBtn(false);
+      setCooldownTimer(3);
     } else {
-      alert("Area belum terdeteksi. Mohon geser peta sedikit ke arah yang ingin Anda cari.");
+      showToast("Area belum terdeteksi. Mohon geser peta sedikit ke arah yang ingin Anda cari.", "warning");
     }
   };
 
@@ -493,8 +548,8 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchQuery)}+Indonesia&limit=1`);
       const data = JSON.parse(await res.text());
       if (data && data.length > 0) navigate('/peta', { lat: data[0].lat, lng: data[0].lon, zoom: 13, triggerSearch: 'true' });
-      else alert("Lokasi tidak ditemukan.");
-    } catch (err) { alert("Terjadi kesalahan: " + err.message); } finally { setIsSearchingLocation(false); }
+      else showToast("Lokasi tidak ditemukan.", "warning");
+    } catch (err) { showToast("Terjadi kesalahan: " + err.message, "error"); } finally { setIsSearchingLocation(false); }
   };
 
   const locateUser = () => {
@@ -502,10 +557,10 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
       setIsLocating(true);
       navigator.geolocation.getCurrentPosition(
         (pos) => { setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setIsLocating(false); },
-        () => { alert("Gagal mendeteksi lokasi."); setIsLocating(false); },
+        () => { showToast("Gagal mendeteksi lokasi.", "error"); setIsLocating(false); },
         { enableHighAccuracy: true }
       );
-    } else alert("Geolocation tidak didukung.");
+    } else showToast("Geolocation tidak didukung.", "error");
   };
 
   const filteredSchools = globalSchools.filter(s => {
@@ -617,11 +672,11 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
             </div>
             <button
               onClick={handleSearchArea}
-              disabled={isFetchingOSM}
+              disabled={isFetchingOSM || cooldownTimer > 0}
               className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 py-2.5 rounded-xl text-sm font-extrabold transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw size={18} className={isFetchingOSM ? "animate-spin" : ""} />
-              {isFetchingOSM ? "Menarik Data..." : "Scrape Area Terlihat"}
+              {isFetchingOSM ? "Menarik Data..." : cooldownTimer > 0 ? `Jeda ${cooldownTimer}s...` : "Scrape Area Terlihat"}
             </button>
           </div>
 
@@ -683,7 +738,7 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
   );
 };
 
-const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, compareList, toggleCompare }) => {
+const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, compareList, toggleCompare, showToast, showConfirm }) => {
   const [search, setSearch] = useState("");
   const [filterJenjang, setFilterJenjang] = useState("");
   const [filterLokasi, setFilterLokasi] = useState("");
@@ -699,9 +754,9 @@ const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, 
       setIsLocating(true);
       navigator.geolocation.getCurrentPosition(
         (pos) => { setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setSortConfig({ key: 'jarak', direction: 'asc' }); setIsLocating(false); setCurrentPage(1); },
-        () => { alert("Gagal mendeteksi lokasi."); setIsLocating(false); }
+        () => { showToast("Gagal mendeteksi lokasi.", "error"); setIsLocating(false); }
       );
-    } else alert("Browser tidak mendukung Geolocation.");
+    } else showToast("Browser tidak mendukung Geolocation.", "error");
   };
 
   const handleSort = (key) => {
@@ -731,7 +786,7 @@ const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, 
   const paginatedData = processedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const exportCSV = () => {
-    if (globalSchools.length === 0) return alert("Belum ada data.");
+    if (globalSchools.length === 0) return showToast("Belum ada data untuk di-export.", "warning");
     const headers = "OSM_ID,Nama Sekolah,Tipe,Alamat,Website,Telepon,Latitude,Longitude\n";
     const csv = globalSchools.map(s => `"${s.id}","${(s.nama || "").replace(/"/g, '""')}","${s.jenjang}","${(s.alamat || "").replace(/"/g, '""')}","${s.web}","${s.telp}",${s.lat},${s.lng}`).join("\n");
     const blob = new Blob([headers + csv], { type: 'text/csv;charset=utf-8;' });
@@ -745,7 +800,7 @@ const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, 
       <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <div><h1 className="text-2xl font-extrabold text-blue-900 flex items-center gap-2"><List size={24} /> Daftar Database Lokal</h1><p className="text-blue-700 mt-1 text-sm font-medium">Data tersimpan di memori browser (LocalStorage).</p></div>
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
-          <button onClick={() => { if (window.confirm("Hapus semua data scrape?")) setGlobalSchools([]); }} className="flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 px-5 py-2.5 rounded-xl font-bold"><Trash2 size={18} /> Hapus</button>
+          <button onClick={() => showConfirm("Hapus semua data scrape dari memori lokal?", () => setGlobalSchools([]))} className="flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 px-5 py-2.5 rounded-xl font-bold"><Trash2 size={18} /> Hapus</button>
           <button onClick={sortByNearest} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold">{isLocating ? <Loader2 size={18} className="animate-spin" /> : <Crosshair size={18} />} Terdekat</button>
           <button onClick={exportCSV} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold"><Download size={18} /> Export</button>
         </div>
@@ -809,7 +864,7 @@ const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, 
   );
 };
 
-const DetailPage = ({ id: identifier, globalSchools, setGlobalSchools, isFetchingOSM, setIsFetchingOSM, favorites, toggleFavorite }) => {
+const DetailPage = ({ id: identifier, globalSchools, setGlobalSchools, isFetchingOSM, setIsFetchingOSM, favorites, toggleFavorite, showToast }) => {
   const [school, setSchool] = useState(() => {
     return globalSchools.find(s => slugify(s.nama) === identifier || s.id === identifier);
   });
@@ -870,9 +925,10 @@ const DetailPage = ({ id: identifier, globalSchools, setGlobalSchools, isFetchin
             <div className="flex gap-2 mb-3"><span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-black uppercase">{school.jenjang}</span><span className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-black flex items-center gap-1"><MapPin size={12} /> OSM Data</span></div>
             <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-2">{school.nama}</h1><p className="text-sm text-gray-500 font-mono">OSM ID: {school.id}</p>
           </div>
-          <div className="w-full md:w-auto mt-4 md:mt-0 flex gap-2">
+          <div className="w-full md:w-auto mt-4 md:mt-0 flex flex-wrap gap-2">
             <BookmarkButton isFavorite={favorites.some(f => f.id === school.id)} onClick={() => toggleFavorite(school)} className="px-6 py-3.5 text-sm" />
             <a href={`https://www.google.com/maps/dir/?api=1&destination=${school.lat},${school.lng}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg hover:bg-blue-700"><Route size={20} /> Rute</a>
+            <a href={`https://www.openstreetmap.org/edit?#map=19/${school.lat}/${school.lng}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-green-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg hover:bg-green-700 transition"><Edit3 size={20} /> Laporkan Data / Edit di OSM</a>
           </div>
         </div>
       </div>
@@ -1277,6 +1333,12 @@ export default function App() {
   const { route, navigate } = useHashRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+
+  const showToast = useCallback((message, type = 'info') => setToast({ message, type }), []);
+  const showConfirm = useCallback((message, onConfirm) => setConfirmDialog({ message, onConfirm }), []);
+
   const [favorites, setFavorites] = useState(() => {
     try { const saved = localStorage.getItem('favorite_schools'); if (saved) return JSON.parse(saved); } catch (e) { console.error("Gagal", e); }
     return [];
@@ -1292,7 +1354,18 @@ export default function App() {
   const [isFetchingOSM, setIsFetchingOSM] = useState(false);
   const [isSearchingGeocode, setIsSearchingGeocode] = useState(false);
 
-  useEffect(() => { try { localStorage.setItem('osm_scraped_schools', JSON.stringify(globalSchools)); } catch (e) { if (e.name === 'QuotaExceededError') alert("Storage penuh!"); } }, [globalSchools]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('osm_scraped_schools', JSON.stringify(globalSchools));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+        const reducedSchools = globalSchools.slice(Math.floor(globalSchools.length / 2));
+        setGlobalSchools(reducedSchools);
+        showToast("Memori lokal penuh! Sebagian data terlama otomatis dihapus agar aplikasi tetap berjalan lancar.", "warning");
+      }
+    }
+  }, [globalSchools, showToast]);
+
   useEffect(() => { try { localStorage.setItem('favorite_schools', JSON.stringify(favorites)); } catch (e) { console.error("Gagal", e); } }, [favorites]);
 
   const handleToggleFavorite = useCallback((school) => {
@@ -1309,12 +1382,12 @@ export default function App() {
         return prev.filter(s => s.id !== school.id);
       }
       if (prev.length >= 3) {
-        alert("Anda hanya dapat membandingkan maksimal 3 sekolah.");
+        showToast("Anda hanya dapat membandingkan maksimal 3 sekolah.", "warning");
         return prev;
       }
       return [...prev, school];
     });
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     if (route.path === '/') document.title = "Live Scrape Sekolah | Direktori OSM";
@@ -1336,7 +1409,7 @@ export default function App() {
     setIsFetchingOSM(true);
     const { south, west, north, east } = bounds;
     const areaSq = Math.abs(north - south) * Math.abs(east - west);
-    if (areaSq > 1.0) { alert("Area peta terlalu luas."); setIsFetchingOSM(false); return; }
+    if (areaSq > 1.0) { showToast("Area peta terlalu luas. Silakan zoom in sedikit.", "warning"); setIsFetchingOSM(false); return; }
 
     const query = `[out:json][timeout:25];(node["amenity"="school"](${south},${west},${north},${east});way["amenity"="school"](${south},${west},${north},${east});node["amenity"="kindergarten"](${south},${west},${north},${east});node["amenity"="university"](${south},${west},${north},${east});way["amenity"="university"](${south},${west},${north},${east});node["amenity"="college"](${south},${west},${north},${east});way["amenity"="college"](${south},${west},${north},${east}););out center;`;
 
@@ -1371,12 +1444,12 @@ export default function App() {
         });
       }
       setGlobalSchools(prev => { const merged = [...prev, ...newSchools]; return Array.from(new Map(merged.map(item => [item.id, item])).values()); });
-    } catch (err) { alert(err.message); } finally { setIsFetchingOSM(false); }
+    } catch (err) { showToast(err.message, "error"); } finally { setIsFetchingOSM(false); }
   };
 
   const renderRoute = () => {
-    if (route.path === '/peta') return <MapPage query={route.query} globalSchools={globalSchools} fetchSchoolsFromOSM={fetchSchoolsFromOSM} isFetchingOSM={isFetchingOSM} navigate={navigate} favorites={favorites} />;
-    if (route.path === '/list') return <ListPage globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} favorites={favorites} toggleFavorite={handleToggleFavorite} compareList={compareList} toggleCompare={handleToggleCompare} />;
+    if (route.path === '/peta') return <MapPage query={route.query} globalSchools={globalSchools} fetchSchoolsFromOSM={fetchSchoolsFromOSM} isFetchingOSM={isFetchingOSM} navigate={navigate} favorites={favorites} showToast={showToast} />;
+    if (route.path === '/list') return <ListPage globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} favorites={favorites} toggleFavorite={handleToggleFavorite} compareList={compareList} toggleCompare={handleToggleCompare} showToast={showToast} showConfirm={showConfirm} />;
     if (route.path === '/direktori') return <DirectoryPage navigate={navigate} />;
     if (route.path === '/favorit') return <FavoritesPage favorites={favorites} toggleFavorite={handleToggleFavorite} />;
     if (route.path === '/analitik') return <AnalyticsPage globalSchools={globalSchools} />;
@@ -1385,12 +1458,14 @@ export default function App() {
     if (route.path === '/privacy-policy') return <PrivacyPolicyPage />;
     if (route.path === '/terms') return <TermsPage />;
     if (route.path === '/contact') return <ContactPage />;
-    if (route.path.startsWith('/sekolah/')) return <DetailPage id={route.path.split('/')[2]} globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} isFetchingOSM={isFetchingOSM} setIsFetchingOSM={setIsFetchingOSM} favorites={favorites} toggleFavorite={handleToggleFavorite} />;
-    return <HomePage navigate={navigate} isSearchingGeocode={isSearchingGeocode} setIsSearchingGeocode={setIsSearchingGeocode} />;
+    if (route.path.startsWith('/sekolah/')) return <DetailPage id={route.path.split('/')[2]} globalSchools={globalSchools} setGlobalSchools={setGlobalSchools} isFetchingOSM={isFetchingOSM} setIsFetchingOSM={setIsFetchingOSM} favorites={favorites} toggleFavorite={handleToggleFavorite} showToast={showToast} />;
+    return <HomePage navigate={navigate} isSearchingGeocode={isSearchingGeocode} setIsSearchingGeocode={setIsSearchingGeocode} showToast={showToast} />;
   };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex flex-col text-gray-800">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmModal dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-[2000] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-18 py-3">
