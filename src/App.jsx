@@ -520,13 +520,13 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
   });
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 relative">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 relative overflow-hidden">
       {showSearchHereBtn && !isFetchingOSM && (
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-[1000] ml-0 md:ml-40">
           <button onClick={handleSearchArea} className="bg-white text-blue-600 px-6 py-2.5 rounded-full font-bold shadow-2xl border hover:bg-blue-50 transition flex items-center gap-2"><RefreshCw size={18} /> Scrape Area Ini</button>
         </div>
       )}
-      <div className="w-full md:w-80 bg-white shadow-xl flex flex-col z-[500] border-r">
+      <div className="w-full md:w-80 shrink-0 h-[45vh] md:h-full bg-white shadow-xl flex flex-col z-[500] border-t md:border-t-0 md:border-r order-2 md:order-1">
         <div className="p-5 border-b bg-gray-50 flex items-center justify-between"><div className="flex items-center gap-2"><Filter className="text-blue-600" size={20} /><h2 className="text-lg font-extrabold text-gray-800">Panel Data</h2></div>{isFetchingOSM && <Loader2 className="animate-spin text-blue-600" size={20} />}</div>
         <div className="p-5 flex-1 overflow-y-auto space-y-6">
           <form onSubmit={handleMapSearch} className="relative">
@@ -610,15 +610,15 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
           </div>
         </div>
       </div>
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0 order-1 md:order-2">
         <MapView schools={filteredSchools} center={mapCenter} zoom={mapZoom} onBoundsChange={handleBoundsChange} onMapMove={handleMapMove} userLoc={userLoc} favorites={favorites} isHeatmapMode={isHeatmapMode} />
-        <div className="absolute top-6 right-6 z-[1000]">
+        <div className="absolute top-6 right-4 md:right-6 z-[1000] scale-90 md:scale-100 origin-top-right">
           <div className="bg-white rounded-xl shadow-lg border p-1.5 flex items-center">
             <button onClick={() => setIsHeatmapMode(false)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${!isHeatmapMode ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}><MapPin size={16} /> Marker</button>
             <button onClick={() => setIsHeatmapMode(true)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${isHeatmapMode ? 'bg-orange-100 text-orange-700' : 'text-gray-500 hover:bg-gray-50'}`}><Flame size={16} /> Heatmap</button>
           </div>
         </div>
-        <button onClick={locateUser} className="absolute bottom-8 right-8 z-[1000] bg-white p-3.5 rounded-full shadow-2xl border hover:bg-blue-50 flex items-center justify-center hover:scale-105 active:scale-95 text-gray-700">{isLocating ? <Loader2 size={24} className="animate-spin text-blue-600" /> : <Crosshair size={24} className={userLoc ? "text-blue-600" : ""} />}</button>
+        <button onClick={locateUser} className="absolute bottom-4 md:bottom-8 right-4 md:right-8 z-[1000] bg-white p-3 rounded-full md:p-3.5 shadow-2xl border hover:bg-blue-50 flex items-center justify-center hover:scale-105 active:scale-95 text-gray-700">{isLocating ? <Loader2 size={24} className="animate-spin text-blue-600" /> : <Crosshair size={24} className={userLoc ? "text-blue-600" : ""} />}</button>
       </div>
     </div>
   );
