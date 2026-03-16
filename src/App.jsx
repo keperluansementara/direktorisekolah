@@ -36,6 +36,17 @@ const getRegionFromAddress = (alamat) => {
   return region.charAt(0).toUpperCase() + region.slice(1).toLowerCase();
 };
 
+// --- UTILS: SLUGIFY FOR SEO ---
+const slugify = (text) => {
+  if (!text) return '';
+  return text.toString().toLowerCase()
+    .replace(/\s+/g, '-')           // Mengganti spasi dengan -
+    .replace(/[^\w\-]+/g, '')       // Menghapus semua karakter non-word
+    .replace(/\-\-+/g, '-')         // Mengganti -- yang berurutan menjadi satu -
+    .replace(/^-+/, '')             // Menghapus awalan -
+    .replace(/-+$/, '');            // Menghapus akhiran -
+};
+
 // --- DATA: TOP CITIES FOR SEO DIRECTORY ---
 const TOP_CITIES = [
   { id: 'jakarta', name: 'DKI Jakarta', lat: -6.2088, lng: 106.8456, zoom: 11 },
@@ -328,6 +339,7 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
       clusterGroup.current.clearLayers();
       const markers = schools.map(school => {
         const isFav = favorites.some(f => f.id === school.id);
+        const schoolSlug = slugify(school.nama) || school.id;
         const starSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="${isFav ? '#eab308' : 'none'}" stroke="${isFav ? '#eab308' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
         const marker = window.L.marker([school.lat, school.lng]);
         const popupContent = `
@@ -336,7 +348,7 @@ const MapView = ({ schools, center, zoom, className = "h-full w-full", onBoundsC
             <strong class="block text-base font-bold mb-1 leading-tight">${school.nama}</strong>
             <span class="text-gray-600 block mb-3 text-xs leading-relaxed"><i class="text-gray-400">OSM ID: ${school.id}</i><br/>${school.alamat}</span>
             <div class="flex gap-2">
-              <a href="#/sekolah/${school.id}" class="flex-1 text-center bg-blue-600 !text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition no-underline font-bold text-xs" style="color: #ffffff !important;">Detail</a>
+              <a href="#/sekolah/${schoolSlug}" class="flex-1 text-center bg-blue-600 !text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition no-underline font-bold text-xs" style="color: #ffffff !important;">Detail</a>
               <button onclick="window.dispatchEvent(new CustomEvent('toggle-fav-osm', {detail: '${school.id}'}))" class="flex-1 flex items-center justify-center gap-1.5 ${isFav ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-gray-50 text-gray-700 border border-gray-200'} px-3 py-2 rounded-lg transition font-bold text-xs cursor-pointer">${starSvg} ${isFav ? 'Tersimpan' : 'Simpan'}</button>
             </div>
           </div>
@@ -437,8 +449,22 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
   const [mapSearchQuery, setMapSearchQuery] = useState("");
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
 
+  // --- FITUR BARU: STATE PENCARIAN LOKAL ---
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [showLocalDropdown, setShowLocalDropdown] = useState(false);
+
   const mapCenter = useMemo(() => query.lat && query.lng ? [parseFloat(query.lat), parseFloat(query.lng)] : [-2.5489, 118.0149], [query.lat, query.lng]);
   const mapZoom = query.zoom ? parseInt(query.zoom) : 5;
+
+  // --- FITUR BARU: FILTER SARAN PENCARIAN LOKAL ---
+  const localSearchSuggestions = useMemo(() => {
+    if (!localSearchQuery || localSearchQuery.length < 2) return [];
+    const lowerQ = localSearchQuery.toLowerCase();
+    return globalSchools.filter(s =>
+      (s.nama && s.nama.toLowerCase().includes(lowerQ)) ||
+      (s.alamat && s.alamat.toLowerCase().includes(lowerQ))
+    ).slice(0, 10); // Menampilkan maksimal 10 hasil agar rapi
+  }, [localSearchQuery, globalSchools]);
 
   useEffect(() => { if (query.isUserLoc === 'true' && query.lat && query.lng) setUserLoc({ lat: parseFloat(query.lat), lng: parseFloat(query.lng) }); }, [query.isUserLoc, query.lat, query.lng]);
   useEffect(() => { if (query.triggerSearch === 'true' && currentBounds && !isFetchingOSM) handleSearchArea(); }, [query.triggerSearch, currentBounds]);
@@ -509,6 +535,49 @@ const MapPage = ({ query, globalSchools, fetchSchoolsFromOSM, isFetchingOSM, nav
             {isSearchingLocation && <div className="absolute right-3 top-3"><Loader2 size={18} className="animate-spin text-blue-600" /></div>}
             <button type="submit" className="hidden">Cari</button>
           </form>
+
+          {/* FITUR BARU: PENCARIAN LOKAL AUTO ZOOM */}
+          <div className="relative z-[2000]">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 text-blue-500" size={18} />
+              <input
+                type="text"
+                placeholder="Cari sekolah di memori lokal..."
+                className="w-full pl-10 pr-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 placeholder-blue-400 shadow-sm transition"
+                value={localSearchQuery}
+                onChange={(e) => { setLocalSearchQuery(e.target.value); setShowLocalDropdown(true); }}
+                onFocus={() => setShowLocalDropdown(true)}
+                onBlur={() => setTimeout(() => setShowLocalDropdown(false), 200)}
+              />
+            </div>
+            {showLocalDropdown && localSearchQuery.length > 1 && (
+              <div className="absolute w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-gray-50">
+                {localSearchSuggestions.length === 0 ? (
+                  <div className="p-4 text-xs font-bold text-gray-400 text-center">Sekolah tidak ditemukan.</div>
+                ) : (
+                  localSearchSuggestions.map(s => (
+                    <div
+                      key={s.id}
+                      className="p-3 hover:bg-blue-50 cursor-pointer transition group"
+                      onClick={() => {
+                        setLocalSearchQuery(""); // Bersihkan input setelah dipilih
+                        setShowLocalDropdown(false);
+                        setUserLoc(null); // Memastikan mode lokasi user mati agar map bisa pindah
+                        // Navigasi dengan memicu hash route perubahan query param
+                        navigate('/peta', { lat: s.lat, lng: s.lng, zoom: 18 });
+                      }}
+                    >
+                      <div className="font-bold text-sm text-blue-900 group-hover:text-blue-700 truncate">{s.nama}</div>
+                      <div className="text-[10px] text-gray-500 truncate mt-1 flex items-center gap-1">
+                        <MapPin size={10} /> <span className="uppercase font-bold">{s.jenjang}</span> • {s.alamat}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center relative overflow-hidden">
             {isFetchingOSM && <div className="absolute inset-0 bg-blue-100/50 backdrop-blur-sm flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>}
             <p className="text-sm text-blue-600 font-bold mb-1">Berhasil Di-Scrape</p><h3 className="text-4xl font-black text-blue-800">{filteredSchools.length}</h3><p className="text-xs text-blue-600 mt-1">Sekolah di memori</p>
@@ -665,7 +734,7 @@ const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, 
                         >
                           {compareList.some(c => c.id === school.id) ? <CheckSquare size={14} /> : <Square size={14} />} Bandingkan
                         </button>
-                        <a href={`#/sekolah/${school.id}`} className="inline-flex items-center text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1.5 rounded-lg">Detail <ChevronRight size={16} /></a>
+                        <a href={`#/sekolah/${slugify(school.nama) || school.id}`} className="inline-flex items-center text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1.5 rounded-lg">Detail <ChevronRight size={16} /></a>
                         <BookmarkButton isFavorite={favorites.some(f => f.id === school.id)} onClick={() => toggleFavorite(school)} />
                       </div>
                     </td>
@@ -681,36 +750,55 @@ const ListPage = ({ globalSchools, setGlobalSchools, favorites, toggleFavorite, 
   );
 };
 
-const DetailPage = ({ id, globalSchools, setGlobalSchools, isFetchingOSM, setIsFetchingOSM, favorites, toggleFavorite }) => {
-  const [school, setSchool] = useState(globalSchools.find(s => s.id === id));
+const DetailPage = ({ id: identifier, globalSchools, setGlobalSchools, isFetchingOSM, setIsFetchingOSM, favorites, toggleFavorite }) => {
+  const [school, setSchool] = useState(() => {
+    return globalSchools.find(s => slugify(s.nama) === identifier || s.id === identifier);
+  });
   const [error, setError] = useState(false);
+
+  // Dynamic Meta Title
+  useEffect(() => {
+    if (school) {
+      document.title = `Profil ${school.nama} | DirektoriSekolah.id`;
+    }
+  }, [school]);
 
   useEffect(() => {
     if (!school && !isFetchingOSM && !error) {
-      const fetchSingleNode = async () => {
-        setIsFetchingOSM(true);
-        try {
-          const query = `[out:json][timeout:10];(node(${id});way(${id});relation(${id}););out center;`;
-          const data = await fetchOverpassData(query);
-          if (data && data.elements && data.elements.length > 0) {
-            const el = data.elements[0];
-            const tags = el.tags || {};
-            const fetchedSchool = {
-              id: el.id.toString(), nama: tags.name || "Tidak Diketahui", jenjang: tags['is_in:school_type'] || tags.amenity || "Sekolah",
-              alamat: tags['addr:full'] || tags['addr:street'] || "Belum dilengkapi oleh relawan OSM",
-              lat: el.lat || el.center?.lat, lng: el.lon || el.center?.lon,
-              telp: tags['phone'] || tags['contact:phone'] || "Belum ada data", email: tags['email'] || tags['contact:email'] || "Belum ada data", web: tags['website'] || tags['contact:website'] || "Belum ada data"
-            };
-            setSchool(fetchedSchool); setGlobalSchools(prev => [...prev, fetchedSchool]);
-          } else setError(true);
-        } catch (e) { setError(true); } finally { setIsFetchingOSM(false); }
-      };
-      fetchSingleNode();
+      // Validasi apakah parameter berupa angka (OSM ID). Jika berupa slug teks, tidak bisa difetch langsung dari Overpass.
+      if (/^\d+$/.test(identifier)) {
+        const fetchSingleNode = async () => {
+          setIsFetchingOSM(true);
+          try {
+            const query = `[out:json][timeout:10];(node(${identifier});way(${identifier});relation(${identifier}););out center;`;
+            const data = await fetchOverpassData(query);
+            if (data && data.elements && data.elements.length > 0) {
+              const el = data.elements[0];
+              const tags = el.tags || {};
+              const fetchedSchool = {
+                id: el.id.toString(), nama: tags.name || "Tidak Diketahui", jenjang: tags['is_in:school_type'] || tags.amenity || "Sekolah",
+                alamat: tags['addr:full'] || tags['addr:street'] || "Belum dilengkapi oleh relawan OSM",
+                lat: el.lat || el.center?.lat, lng: el.lon || el.center?.lon,
+                telp: tags['phone'] || tags['contact:phone'] || "Belum ada data", email: tags['email'] || tags['contact:email'] || "Belum ada data", web: tags['website'] || tags['contact:website'] || "Belum ada data"
+              };
+              setSchool(fetchedSchool);
+              setGlobalSchools(prev => {
+                if (prev.some(p => p.id === fetchedSchool.id)) return prev;
+                return [...prev, fetchedSchool];
+              });
+            } else setError(true);
+          } catch (e) { setError(true); } finally { setIsFetchingOSM(false); }
+        };
+        fetchSingleNode();
+      } else {
+        // Karena ini slug dan tidak ada di data lokal, kita tidak bisa request data
+        setError(true);
+      }
     }
-  }, [id, school, isFetchingOSM, error]);
+  }, [identifier, school, isFetchingOSM, error, setGlobalSchools]);
 
   if (isFetchingOSM && !school) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-blue-600 mb-4" size={40} />Mencari data OSM...</div>;
-  if (error || !school) return <div className="py-32 text-center"><h2 className="text-3xl font-extrabold mb-4 text-gray-800">404 - Sekolah Tidak Ditemukan</h2><a href="#/list" className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">Kembali</a></div>;
+  if (error || !school) return <div className="py-32 text-center"><h2 className="text-3xl font-extrabold mb-4 text-gray-800">404 - Sekolah Tidak Ditemukan</h2><p className="text-gray-500 mb-6 max-w-md mx-auto">Sekolah dengan nama ini belum ada di data lokal Anda atau tidak valid di OpenStreetMap.</p><a href="#/list" className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold">Kembali ke Database</a></div>;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -791,7 +879,7 @@ const FavoritesPage = ({ favorites, toggleFavorite }) => {
                     <td className="p-5 text-sm text-gray-600 max-w-xs truncate">{school.alamat}</td>
                     <td className="p-5 text-right">
                       <div className="flex justify-end gap-2 items-center">
-                        <a href={`#/sekolah/${school.id}`} className="inline-flex items-center text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50 px-3 py-1.5 rounded-lg transition">
+                        <a href={`#/sekolah/${slugify(school.nama) || school.id}`} className="inline-flex items-center text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50 px-3 py-1.5 rounded-lg transition">
                           Detail
                         </a>
                         <BookmarkButton isFavorite={true} onClick={() => toggleFavorite(school)} className="px-3 py-1.5 text-xs" />
@@ -878,7 +966,7 @@ const ComparePage = ({ compareList, toggleCompare, navigate }) => {
             </tr>
             <tr className="hover:bg-gray-50/50">
               <td className="p-6 font-bold text-gray-600 bg-gray-50/30">Aksi</td>
-              {compareList.map(s => <td key={s.id} className="p-6 border-l border-gray-100"><button onClick={() => navigate('/sekolah/' + s.id)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold transition shadow-sm">Lihat Detail</button></td>)}
+              {compareList.map(s => <td key={s.id} className="p-6 border-l border-gray-100"><button onClick={() => navigate('/sekolah/' + (slugify(s.nama) || s.id))} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold transition shadow-sm">Lihat Detail</button></td>)}
               {Array.from({ length: 3 - compareList.length }).map((_, i) => <td key={`e5-${i}`} className="p-6 border-l border-gray-100 bg-gray-50/50"></td>)}
             </tr>
           </tbody>
@@ -1025,7 +1113,7 @@ const AnalyticsPage = ({ globalSchools }) => {
                 <thead><tr className="bg-white border-b border-gray-100 text-gray-500 uppercase text-xs font-bold tracking-wider"><th className="p-5">Nama Institusi</th><th className="p-5">Alamat / Wilayah</th><th className="p-5 text-right">Aksi</th></tr></thead>
                 <tbody className="divide-y divide-gray-100">
                   {tableData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(s => (
-                    <tr key={s.id} className="hover:bg-blue-50/50 transition"><td className="p-5"><strong className="text-gray-900 block text-base">{s.nama}</strong><span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase font-black mt-1 inline-block">{s.jenjang}</span></td><td className="p-5 text-gray-600 text-sm truncate max-w-[250px]" title={s.alamat}>{s.alamat}</td><td className="p-5 text-right"><a href={`#/sekolah/${s.id}`} className="inline-flex items-center text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg transition whitespace-nowrap">Lihat Detail</a></td></tr>
+                    <tr key={s.id} className="hover:bg-blue-50/50 transition"><td className="p-5"><strong className="text-gray-900 block text-base">{s.nama}</strong><span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase font-black mt-1 inline-block">{s.jenjang}</span></td><td className="p-5 text-gray-600 text-sm truncate max-w-[250px]" title={s.alamat}>{s.alamat}</td><td className="p-5 text-right"><a href={`#/sekolah/${slugify(s.nama) || s.id}`} className="inline-flex items-center text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg transition whitespace-nowrap">Lihat Detail</a></td></tr>
                   ))}
                 </tbody>
               </table>
@@ -1090,6 +1178,7 @@ export default function App() {
     else if (route.path === '/favorit') document.title = "Sekolah Favorit | Direktori Sekolah";
     else if (route.path === '/analitik') document.title = "Analitik Data | Direktori Sekolah";
     else if (route.path === '/compare') document.title = "Bandingkan Sekolah | Direktori Sekolah";
+    else if (route.path.startsWith('/sekolah/')) document.title = "Memuat Profil... | DirektoriSekolah.id";
     setIsMobileMenuOpen(false);
   }, [route.path]);
 
